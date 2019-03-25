@@ -138,21 +138,137 @@ $(document).ready(function () {
 <p>You must address the following in your exploratory analysis. For each question/task you will need to make a single plot. U</p>
 <ol style="list-style-type: decimal">
 <li>Have total emissions from PM2.5 decreased in the United States from 1999 to 2008? Using the base plotting system, make a plot showing the total PM2.5 emission from all sources for each of the years 1999, 2002, 2005, and 2008.</li>
-<li>Have total emissions from PM2.5 decreased in the Baltimore City, Maryland (fips==“24510”) from 1999 to 2008? Use the base plotting system to make a plot answering this question.</li>
-<li>Of the four types of sources indicated by the type (point, nonpoint, onroad, nonroad) variable, which of these four sources have seen decreases in emissions from 1999–2008 for Baltimore City? Which have seen increases in emissions from 1999–2008? Use the ggplot2 plotting system to make a plot answer this question.</li>
+<li>Have total emissions from PM2.5 decreased in the Baltimore City, Maryland from 1999 to 2008? Use the base plotting system to make a plot answering this question.</li>
+<li>Of the four types of sources indicated by the variable, which of these four sources have seen decreases in emissions from 1999–2008 for Baltimore City? Which have seen increases in emissions from 1999–2008? Use the ggplot2 plotting system to make a plot answer this question.</li>
 <li>Across the United States, how have emissions from coal combustion-related sources changed from 1999–2008?</li>
 <li>How have emissions from motor vehicle sources changed from 1999–2008 in Baltimore City?</li>
-<li>Compare emissions from motor vehicle sources in Baltimore City with emissions from motor vehicle sources in Los Angeles County, California (fips==“06037”). Which city has seen greater changes over time in motor vehicle emissions?</li>
+<li>Compare emissions from motor vehicle sources in Baltimore City with emissions from motor vehicle sources in Los Angeles County, California. Which city has seen greater changes over time in motor vehicle emissions?</li>
 </ol>
 </div>
 <div id="submission-instructions" class="section level1">
 <h1>Submission instructions</h1>
 <ol style="list-style-type: decimal">
 <li>Construct the plot and save it to a PNG file.</li>
-<li>Create a separate R code file (plot1.R, plot2.R, etc.) that constructs the corresponding plot, i.e. code in plot1.R constructs the plot1.png plot. Your code file should include code for reading the data so that the plot can be fully reproduced. You must also include the code that creates the PNG file. Only include the code for a single plot (i.e. plot1.R should only include code for producing plot1.png)</li>
+<li>Create a separate R code file that constructs the corresponding plot, i.e. code in plot1.R constructs the plot1.png plot. Your code file should include code for reading the data so that the plot can be fully reproduced. You must also include the code that creates the PNG file. Only include the code for a single plot.</li>
 <li>Upload the PNG file on the Assignment submission page</li>
 <li>Copy and paste the R code from the corresponding R file into the text box at the appropriate point in the peer assessment.</li>
 </ol>
+</div>
+<div id="eda" class="section level1">
+<h1>EDA</h1>
+<p>Load data</p>
+<pre class="r"><code>library(dplyr)</code></pre>
+<pre><code>## 
+## Attaching package: 'dplyr'</code></pre>
+<pre><code>## The following objects are masked from 'package:stats':
+## 
+##     filter, lag</code></pre>
+<pre><code>## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(ggplot2)
+library(scales)
+library(data.table)</code></pre>
+<pre><code>## Warning: package 'data.table' was built under R version 3.5.2</code></pre>
+<pre><code>## 
+## Attaching package: 'data.table'</code></pre>
+<pre><code>## The following objects are masked from 'package:dplyr':
+## 
+##     between, first, last</code></pre>
+<pre class="r"><code>path &lt;- getwd()
+download.file(url = &quot;https://d396qusza40orc.cloudfront.net/exdata%2Fdata%2FNEI_data.zip&quot;
+              , destfile = paste(path, &quot;dataFiles.zip&quot;, sep = &quot;/&quot;))
+unzip(zipfile = &quot;dataFiles.zip&quot;)
+
+SCC &lt;- data.table::as.data.table(x = readRDS(file = &quot;Source_Classification_Code.rds&quot;))
+NEI &lt;- data.table::as.data.table(x = readRDS(file = &quot;summarySCC_PM25.rds&quot;))</code></pre>
+<p>Question1: Have total emissions from PM2.5 decreased in the United States btw. 1999 and 2008?</p>
+<pre class="r"><code>NEI[, Emissions := lapply(.SD, as.numeric), .SDcols = c(&quot;Emissions&quot;)]
+
+totalNEI &lt;- NEI[, lapply(.SD, sum, na.rm = TRUE), .SDcols = c(&quot;Emissions&quot;), by = year]
+
+png(filename='plot1.png')
+
+#Barplot of US emissions by year
+barplot(totalNEI[, Emissions]
+        , names = totalNEI[, year]
+        , xlab = &quot;Years&quot;, ylab = &quot;Emissions&quot;
+        , main = &quot;US emissions btw. 1999 and 2008&quot;)</code></pre>
+<p>Question2: Have total emissions from PM2.5 decreased in the Baltimore, MD btw. 1999 and 2008?</p>
+<pre class="r"><code>NEI[, Emissions := lapply(.SD, as.numeric), .SDcols = c(&quot;Emissions&quot;)]
+totalNEI &lt;- NEI[fips=='24510', lapply(.SD, sum, na.rm = TRUE)
+                , .SDcols = c(&quot;Emissions&quot;)
+                , by = year]
+
+png(filename='plot2.png')
+
+barplot(totalNEI[, Emissions]
+        , names = totalNEI[, year]
+        , xlab = &quot;Years&quot;, ylab = &quot;Emissions&quot;
+        , main = &quot;Baltimore, MD emissions btw. 1999 and 2008&quot;)</code></pre>
+<p>Question3: Of the four types of sources indicated by the (point, nonpoint, onroad, nonroad) variable, which of these four sources have seen decreases in emissions btw. 1999 and 2008 for Baltimore, MD? Which have seen increases in emissions btw. 1999 and 008?</p>
+<pre class="r"><code># Subset NEI data 
+baltimoreNEI &lt;- NEI[fips==&quot;24510&quot;,]
+
+png(&quot;plot3.png&quot;)
+
+ggplot(baltimoreNEI,aes(factor(year),Emissions,fill=type)) +
+  geom_bar(stat=&quot;identity&quot;) +
+  scale_fill_brewer(palette = &quot;Set1&quot;)+
+  facet_grid(.~type) + 
+  labs(x=&quot;Year&quot;, y=expression(&quot;Total PM&quot;[2.5]*&quot; emission (tons)&quot;)) + 
+  labs(title=expression(&quot;PM&quot;[2.5]*&quot; Baltimore, MD emissions btw. 1999 and 2008 by source type&quot;))+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())</code></pre>
+<p>Question4: Across the United States, how have emissions from coal combustion-related sources changed btw. 1999 and 2008?</p>
+<pre class="r"><code># Subset coal combustion related NEI data
+combRel &lt;- grepl(&quot;comb&quot;, SCC[, SCC.Level.One], ignore.case=TRUE)
+coalRel &lt;- grepl(&quot;coal&quot;, SCC[, SCC.Level.Four], ignore.case=TRUE) 
+combSCC &lt;- SCC[combRel &amp; coalRel, SCC]
+combNEI &lt;- NEI[NEI[,SCC] %in% combSCC ]
+
+png(&quot;plot4.png&quot;)
+
+ggplot(combNEI,aes(x = factor(year),y = Emissions/10^5)) +
+  geom_bar(stat=&quot;identity&quot;, fill =&quot;#99d4ff&quot;, width=0.50) +
+  labs(x=&quot;Year&quot;, y=expression(&quot;Total PM&quot;[2.5]*&quot; emission (10^5 tons)&quot;)) + 
+  labs(title=expression(&quot;PM&quot;[2.5]*&quot; Coal combustion emissions in US btw.1999 and 2008&quot;))+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())</code></pre>
+<p>Question5: How have emissions from motor vehicle sources changed btw. 1999 and 2008 in Baltimore, MD?</p>
+<pre class="r"><code># Gather the subset of the NEI data which corresponds to vehicles
+condition &lt;- grepl(&quot;vehicle&quot;, SCC[, SCC.Level.Two], ignore.case=TRUE)
+vehiclesSCC &lt;- SCC[condition, SCC]
+vehiclesNEI &lt;- NEI[NEI[, SCC] %in% vehiclesSCC,]
+
+# Subset the vehicles NEI data to Baltimore's fip
+baltVehiclesNEI &lt;- vehiclesNEI[fips==&quot;24510&quot;,]
+
+png(&quot;plot5.png&quot;)
+
+ggplot(baltVehiclesNEI,aes(factor(year),Emissions)) +
+  geom_bar(stat=&quot;identity&quot;, fill =&quot;#99d4ff&quot; ,width=0.50) +
+  labs(x=&quot;Year&quot;, y=expression(&quot;Total PM&quot;[2.5]*&quot; emission (10^5 tons)&quot;)) + 
+  labs(title=expression(&quot;PM&quot;[2.5]*&quot; Motor vehicle emissions in Baltimore btw. 1999 and 2008&quot;))+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())</code></pre>
+<p>Question6: Compare emissions from motor vehicle sources in Baltimore, MD with emissions from motor vehicle sources in Los Angeles County, California. Which city has seen greater changes over time in motor vehicle emissions?</p>
+<pre class="r"><code># Gather the subset of the NEI data which corresponds to vehicles
+condition &lt;- grepl(&quot;vehicle&quot;, SCC[, SCC.Level.Two], ignore.case=TRUE)
+vehSCC &lt;- SCC[condition, SCC]
+vehNEI &lt;- NEI[NEI[, SCC] %in% vehSCC,]
+
+# Subset the vehicles NEI data by each city's fip and add city name.
+vehBaltimoreNEI &lt;- vehNEI[fips == &quot;24510&quot;,]
+vehBaltimoreNEI[, city := c(&quot;Baltimore, MD&quot;)]
+
+vehNEI &lt;- vehNEI[fips == &quot;06037&quot;,]
+vehNEI[, city := c(&quot;Los Angeles, CA&quot;)]
+
+# Combine data.tables into one data.table
+bothNEI &lt;- rbind(vehBaltimoreNEI,vehNEI)
+
+png(&quot;plot6.png&quot;)
+
+ggplot(bothNEI, aes(x=factor(year), y=Emissions, fill=City)) +
+  geom_bar(aes(fill=year),stat=&quot;identity&quot;) +
+  facet_grid(scales=&quot;free&quot;, space=&quot;free&quot;, .~city) +
+  labs(x=&quot;Year&quot;, y=expression(&quot;Total PM&quot;[2.5]*&quot; emission (kilo-tons)&quot;)) + 
+  labs(title=expression(&quot;PM&quot;[2.5]*&quot; Motor vehicle emissions in Baltimore, MD and Los Angeles, CA \n btw. 1999 and 2008&quot;))+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())</code></pre>
 </div>
 
 

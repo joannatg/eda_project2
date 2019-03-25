@@ -5,9 +5,6 @@ date: "March 24, 2019"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 #Assignment
 
 The overall goal of this assignment is to explore the National Emissions Inventory database and see what it say about fine particulate matter pollution in the United states over the 10-year period 1999–2008. You may use any R package you want to support your analysis.
@@ -16,14 +13,151 @@ The overall goal of this assignment is to explore the National Emissions Invento
 You must address the following in your exploratory analysis. For each question/task you will need to make a single plot. U
 
 1. Have total emissions from PM2.5 decreased in the United States from 1999 to 2008? Using the base plotting system, make a plot showing the total PM2.5 emission from all sources for each of the years 1999, 2002, 2005, and 2008.
-2. Have total emissions from PM2.5 decreased in the Baltimore City, Maryland (\color{red}{\verb|fips == "24510"|}fips=="24510") from 1999 to 2008? Use the base plotting system to make a plot answering this question.
-3. Of the four types of sources indicated by the \color{red}{\verb|type|}type (point, nonpoint, onroad, nonroad) variable, which of these four sources have seen decreases in emissions from 1999–2008 for Baltimore City? Which have seen increases in emissions from 1999–2008? Use the ggplot2 plotting system to make a plot answer this question.
+2. Have total emissions from PM2.5 decreased in the Baltimore City, Maryland from 1999 to 2008? Use the base plotting system to make a plot answering this question.
+3. Of the four types of sources indicated by the variable, which of these four sources have seen decreases in emissions from 1999–2008 for Baltimore City? Which have seen increases in emissions from 1999–2008? Use the ggplot2 plotting system to make a plot answer this question.
 4. Across the United States, how have emissions from coal combustion-related sources changed from 1999–2008?
 5. How have emissions from motor vehicle sources changed from 1999–2008 in Baltimore City?
-6. Compare emissions from motor vehicle sources in Baltimore City with emissions from motor vehicle sources in Los Angeles County, California (\color{red}{\verb|fips == "06037"|}fips=="06037"). Which city has seen greater changes over time in motor vehicle emissions?
+6. Compare emissions from motor vehicle sources in Baltimore City with emissions from motor vehicle sources in Los Angeles County, California. Which city has seen greater changes over time in motor vehicle emissions?
 
 #Submission instructions
 1. Construct the plot and save it to a PNG file.
-2. Create a separate R code file (\color{red}{\verb|plot1.R|}plot1.R, \color{red}{\verb|plot2.R|}plot2.R, etc.) that constructs the corresponding plot, i.e. code in plot1.R constructs the plot1.png plot. Your code file should include code for reading the data so that the plot can be fully reproduced. You must also include the code that creates the PNG file. Only include the code for a single plot (i.e. \color{red}{\verb|plot1.R|}plot1.R should only include code for producing \color{red}{\verb|plot1.png|}plot1.png)
+2. Create a separate R code file that constructs the corresponding plot, i.e. code in plot1.R constructs the plot1.png plot. Your code file should include code for reading the data so that the plot can be fully reproduced. You must also include the code that creates the PNG file. Only include the code for a single plot.
 3. Upload the PNG file on the Assignment submission page
 4. Copy and paste the R code from the corresponding R file into the text box at the appropriate point in the peer assessment.
+
+#EDA
+
+Load data
+```{r}
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(data.table)
+
+path <- getwd()
+download.file(url = "https://d396qusza40orc.cloudfront.net/exdata%2Fdata%2FNEI_data.zip"
+              , destfile = paste(path, "dataFiles.zip", sep = "/"))
+unzip(zipfile = "dataFiles.zip")
+
+SCC <- data.table::as.data.table(x = readRDS(file = "Source_Classification_Code.rds"))
+NEI <- data.table::as.data.table(x = readRDS(file = "summarySCC_PM25.rds"))
+```
+
+Question1: Have total emissions from PM2.5 decreased in the United States btw. 1999 and 2008? 
+``` {r}
+NEI[, Emissions := lapply(.SD, as.numeric), .SDcols = c("Emissions")]
+
+totalNEI <- NEI[, lapply(.SD, sum, na.rm = TRUE), .SDcols = c("Emissions"), by = year]
+
+png(filename='plot1.png')
+
+#Barplot of US emissions by year
+barplot(totalNEI[, Emissions]
+        , names = totalNEI[, year]
+        , xlab = "Years", ylab = "Emissions"
+        , main = "US emissions btw. 1999 and 2008")
+```
+
+
+Question2: Have total emissions from PM2.5 decreased in the Baltimore, MD btw. 1999 and 2008? 
+
+```{r}
+NEI[, Emissions := lapply(.SD, as.numeric), .SDcols = c("Emissions")]
+totalNEI <- NEI[fips=='24510', lapply(.SD, sum, na.rm = TRUE)
+                , .SDcols = c("Emissions")
+                , by = year]
+
+png(filename='plot2.png')
+
+barplot(totalNEI[, Emissions]
+        , names = totalNEI[, year]
+        , xlab = "Years", ylab = "Emissions"
+        , main = "Baltimore, MD emissions btw. 1999 and 2008")
+```
+
+Question3: Of the four types of sources indicated by the  (point, nonpoint, onroad, nonroad) variable, which of these four sources have seen decreases in emissions btw. 1999 and 2008 for Baltimore, MD? 
+Which have seen increases in emissions btw. 1999 and 008? 
+
+
+```{r}
+# Subset NEI data 
+baltimoreNEI <- NEI[fips=="24510",]
+
+png("plot3.png")
+
+ggplot(baltimoreNEI,aes(factor(year),Emissions,fill=type)) +
+  geom_bar(stat="identity") +
+  scale_fill_brewer(palette = "Set1")+
+  facet_grid(.~type) + 
+  labs(x="Year", y=expression("Total PM"[2.5]*" emission (tons)")) + 
+  labs(title=expression("PM"[2.5]*" Baltimore, MD emissions btw. 1999 and 2008 by source type"))+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
+
+
+Question4: Across the United States, how have emissions from coal combustion-related sources changed btw. 1999 and 2008?
+
+```{r}
+# Subset coal combustion related NEI data
+combRel <- grepl("comb", SCC[, SCC.Level.One], ignore.case=TRUE)
+coalRel <- grepl("coal", SCC[, SCC.Level.Four], ignore.case=TRUE) 
+combSCC <- SCC[combRel & coalRel, SCC]
+combNEI <- NEI[NEI[,SCC] %in% combSCC ]
+
+png("plot4.png")
+
+ggplot(combNEI,aes(x = factor(year),y = Emissions/10^5)) +
+  geom_bar(stat="identity", fill ="#99d4ff", width=0.50) +
+  labs(x="Year", y=expression("Total PM"[2.5]*" emission (10^5 tons)")) + 
+  labs(title=expression("PM"[2.5]*" Coal combustion emissions in US btw.1999 and 2008"))+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
+
+
+Question5: How have emissions from motor vehicle sources changed btw. 1999 and 2008 in Baltimore, MD?
+
+```{r}
+# Gather the subset of the NEI data which corresponds to vehicles
+condition <- grepl("vehicle", SCC[, SCC.Level.Two], ignore.case=TRUE)
+vehiclesSCC <- SCC[condition, SCC]
+vehiclesNEI <- NEI[NEI[, SCC] %in% vehiclesSCC,]
+
+# Subset the vehicles NEI data to Baltimore's fip
+baltVehiclesNEI <- vehiclesNEI[fips=="24510",]
+
+png("plot5.png")
+
+ggplot(baltVehiclesNEI,aes(factor(year),Emissions)) +
+  geom_bar(stat="identity", fill ="#99d4ff" ,width=0.50) +
+  labs(x="Year", y=expression("Total PM"[2.5]*" emission (10^5 tons)")) + 
+  labs(title=expression("PM"[2.5]*" Motor vehicle emissions in Baltimore btw. 1999 and 2008"))+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
+
+
+Question6: Compare emissions from motor vehicle sources in Baltimore, MD with emissions from motor vehicle sources in Los Angeles County, California. 
+Which city has seen greater changes over time in motor vehicle emissions?
+
+```{r}
+# Gather the subset of the NEI data which corresponds to vehicles
+condition <- grepl("vehicle", SCC[, SCC.Level.Two], ignore.case=TRUE)
+vehSCC <- SCC[condition, SCC]
+vehNEI <- NEI[NEI[, SCC] %in% vehSCC,]
+
+# Subset the vehicles NEI data by each city's fip and add city name.
+vehBaltimoreNEI <- vehNEI[fips == "24510",]
+vehBaltimoreNEI[, city := c("Baltimore, MD")]
+
+vehNEI <- vehNEI[fips == "06037",]
+vehNEI[, city := c("Los Angeles, CA")]
+
+# Combine data.tables into one data.table
+bothNEI <- rbind(vehBaltimoreNEI,vehNEI)
+
+png("plot6.png")
+
+ggplot(bothNEI, aes(x=factor(year), y=Emissions, fill=City)) +
+  geom_bar(aes(fill=year),stat="identity") +
+  facet_grid(scales="free", space="free", .~city) +
+  labs(x="Year", y=expression("Total PM"[2.5]*" emission (kilo-tons)")) + 
+  labs(title=expression("PM"[2.5]*" Motor vehicle emissions in Baltimore, MD and Los Angeles, CA \n btw. 1999 and 2008"))+theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+```
+
+
